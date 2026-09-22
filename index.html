@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スプラ・ランナー (Splat Runner)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Mochiy+Pop+One&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: #0f0a1c;
+      color: #fff;
+      font-family: 'Mochiy Pop One', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 450px;
+      border: 4px solid #f90067;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(249, 0, 103, 0.4), 0 0 40px rgba(18, 227, 219, 0.2);
+      overflow: hidden;
+      background: #19122e;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* UI Overlay */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 15px 20px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      background: rgba(15, 10, 28, 0.8);
+      border: 2px solid #12e3db;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 1rem;
+      color: #fff;
+      text-shadow: 2px 2px 0 #000;
+      box-shadow: 3px 3px 0 #12e3db;
+    }
+
+    .ink-gauge-container {
+      width: 160px;
+      height: 20px;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ink-gauge-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #12e3db, #23f39d);
+      transition: width 0.1s linear;
+    }
+
+    /* Screens (Start, Clear, Game Over) */
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 10, 28, 0.88);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    .title {
+      font-family: 'Permanent Marker', 'Mochiy Pop One', cursive;
+      font-size: 3.2rem;
+      color: #f90067;
+      text-shadow: 4px 4px 0 #12e3db, -2px -2px 0 #fff;
+      margin-bottom: 10px;
+      transform: rotate(-3deg);
+    }
+
+    .sub-title {
+      font-size: 1.1rem;
+      color: #12e3db;
+      margin-bottom: 25px;
+    }
+
+    .btn {
+      background: #f90067;
+      color: #fff;
+      border: 3px solid #fff;
+      padding: 12px 36px;
+      font-size: 1.3rem;
+      font-family: 'Mochiy Pop One', sans-serif;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #a30043, 0 10px 15px rgba(0,0,0,0.5);
+      transition: all 0.1s ease;
+      letter-spacing: 1px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 0 #a30043, 0 12px 20px rgba(0,0,0,0.6);
+      background: #ff1a7d;
+    }
+
+    .btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #a30043, 0 4px 8px rgba(0,0,0,0.5);
+    }
+
+    .controls-info {
+      margin-top: 25px;
+      background: rgba(255,255,255,0.08);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      text-align: center;
+      color: #d1c9ef;
+      border: 1px dashed rgba(255,255,255,0.2);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+    <!-- UI Overlay -->
+    <div class="ui-layer">
+      <div class="top-bar">
+        <div class="badge" id="scoreDisplay">イクラ: 0</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size:0.8rem; font-weight:bold;">INK</span>
+          <div class="ink-gauge-container">
+            <div class="ink-gauge-fill" id="inkGauge"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div class="screen" id="startScreen">
+      <h1 class="title">SPLAT RUNNER</h1>
+      <p class="sub-title">～ インクを塗りまくれ！マリオ風イカアクション ～</p>
+      <button class="btn" id="startBtn">START!</button>
+      <div class="controls-info">
+        【操作方法】<br>
+        [A][D] または [←][→] : 移動<br>
+        [W] / [Space] / [K] : ジャンプ<br>
+        [J] または [左クリック] : インクショット<br>
+        ★ 自カラー（水色）のインクの上では<b>イカ移動（高速）</b>ができるぞ！
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="screen hidden" id="gameOverScreen">
+      <h1 class="title" style="color: #ff3333; text-shadow: 3px 3px 0 #000;">GAME OVER</h1>
+      <p class="sub-title" id="gameOverReason">敵にやられてしまった！</p>
+      <button class="btn" id="retryBtn">RETRY</button>
+    </div>
+
+    <!-- Game Clear Screen -->
+    <div class="screen hidden" id="gameClearScreen">
+      <h1 class="title" style="color: #23f39d; text-shadow: 3px 3px 0 #f90067;">STAGE CLEAR!</h1>
+      <p class="sub-title" id="clearScoreText">ゲットしたイクラ: 0</p>
+      <button class="btn" id="nextBtn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI Elements
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const gameClearScreen = document.getElementById('gameClearScreen');
+    const startBtn = document.getElementById('startBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const inkGauge = document.getElementById('inkGauge');
+    const clearScoreText = document.getElementById('clearScoreText');
+
+    // Sound FX (Web Audio API)
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playSound(type) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'jump') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(450, now + 0.15);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else if (type === 'shoot') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.1);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'coin') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.setValueAtTime(1200, now + 0.08);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } else if (type === 'stomp') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === 'clear') {
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((freq, idx) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          o.type = 'triangle';
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.2, now + idx * 0.1);
+          g.gain.linearRampToValueAtTime(0.01, now + idx * 0.1 + 0.3);
+          o.start(now + idx * 0.1);
+          o.stop(now + idx * 0.1 + 0.3);
+        });
+      }
+    }
+
+    // Colors
+    const COLOR_PLAYER = '#12e3db'; // Cyan
+    const COLOR_ENEMY_INK = '#f90067'; // Magenta
+
+    // Key Listener
+    const keys = { left: false, right: false, jump: false, shoot: false };
+    
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+      if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyK') keys.jump = true;
+      if (e.code === 'KeyJ') keys.shoot = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+      if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyK') keys.jump = false;
+      if (e.code === 'KeyJ') keys.shoot = false;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) keys.shoot = true;
+    });
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0) keys.shoot = false;
+    });
+
+    // Game Variables
+    let gameState = 'START'; // START, PLAYING, GAMEOVER, CLEAR
+    let cameraX = 0;
+    let score = 0;
+    let inkAmount = 100;
+
+    // Player Object
+    const player = {
+      x: 100,
+      y: 200,
+      vx: 0,
+      vy: 0,
+      width: 28,
+      height: 38,
+      isGrounded: false,
+      facingRight: true,
+      isSquid: false,
+      shootCooldown: 0,
+
+      reset() {
+        this.x = 100;
+        this.y = 200;
+        this.vx = 0;
+        this.vy = 0;
+        this.isGrounded = false;
+        this.isSquid = false;
+        this.shootCooldown = 0;
+      }
+    };
+
+    // Level Objects
+    let platforms = [];
+    let inkSpots = []; // {x, y, radius, color}
+    let bullets = [];  // {x, y, vx, vy, radius, color, isPlayer}
+    let enemies = [];  // {x, y, vx, width, height, alive}
+    let coins = [];    // {x, y, collected}
+    let goal = { x: 0, y: 0, width: 30, height: 180 };
+
+    // Stage Generation (Mario-style layout)
+    function buildLevel() {
+      platforms = [
+        // Ground blocks
+        { x: 0, y: 380, width: 900, height: 70 },
+        { x: 1000, y: 380, width: 800, height: 70 },
+        { x: 1900, y: 380, width: 1000, height: 70 },
+
+        // Platforms (Elevated)
+        { x: 300, y: 270, width: 140, height: 24 },
+        { x: 500, y: 200, width: 120, height: 24 },
+        { x: 720, y: 280, width: 100, height: 24 },
+
+        { x: 1150, y: 260, width: 160, height: 24 },
+        { x: 1400, y: 190, width: 140, height: 24 },
+        { x: 1650, y: 270, width: 120, height: 24 },
+
+        // Staircase to Goal
+        { x: 2300, y: 330, width: 50, height: 50 },
+        { x: 2350, y: 280, width: 50, height: 100 },
+        { x: 2400, y: 230, width: 50, height: 150 },
+        { x: 2450, y: 180, width: 50, height: 200 },
+      ];
+
+      // Initial Enemy Ink Splatters
+      inkSpots = [
+        { x: 400, y: 380, radius: 35, color: COLOR_ENEMY_INK },
+        { x: 1200, y: 380, radius: 45, color: COLOR_ENEMY_INK },
+        { x: 1250, y: 380, radius: 40, color: COLOR_ENEMY_INK },
+        { x: 1450, y: 190, radius: 25, color: COLOR_ENEMY_INK },
+      ];
+
+      bullets = [];
+
+      // Octarian-like Enemies
+      enemies = [
+        { x: 450, y: 345, vx: -1.2, width: 32, height: 35, alive: true },
+        { x: 1250, y: 345, vx: 1.5, width: 32, height: 35, alive: true },
+        { x: 1430, y: 155, vx: -1.0, width: 32, height: 35, alive: true },
+        { x: 2050, y: 345, vx: -1.8, width: 32, height: 35, alive: true },
+      ];
+
+      // Golden Power Eggs / Coins
+      coins = [
+        { x: 330, y: 230, collected: false },
+        { x: 370, y: 230, collected: false },
+        { x: 530, y: 160, collected: false },
+        { x: 560, y: 160, collected: false },
+        { x: 750, y: 240, collected: false },
+
+        { x: 1200, y: 220, collected: false },
+        { x: 1250, y: 220, collected: false },
+        { x: 1450, y: 140, collected: false },
+
+        { x: 2000, y: 330, collected: false },
+        { x: 2050, y: 330, collected: false },
+        { x: 2100, y: 330, collected: false },
+      ];
+
+      // Goal Flagpole
+      goal = { x: 2700, y: 180, width: 20, height: 200 };
+    }
+
+    function startGame() {
+      initAudio();
+      score = 0;
+      inkAmount = 100;
+      cameraX = 0;
+      player.reset();
+      buildLevel();
+
+      scoreDisplay.textContent = `イクラ: ${score}`;
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      gameClearScreen.classList.add('hidden');
+
+      gameState = 'PLAYING';
+    }
+
+    // Trigger Game Over
+    function triggerGameOver(reason) {
+      gameState = 'GAMEOVER';
+      document.getElementById('gameOverReason').textContent = reason;
+      gameOverScreen.classList.remove('hidden');
+    }
+
+    // Trigger Clear
+    function triggerClear() {
+      gameState = 'CLEAR';
+      playSound('clear');
+      clearScoreText.textContent = `ゲットしたイクラ: ${score}`;
+      gameClearScreen.classList.remove('hidden');
+    }
+
+    // Check if player is standing on friendly cyan ink
+    function checkOnPlayerInk() {
+      const feetX = player.x + player.width / 2;
+      const feetY = player.y + player.height;
+
+      return inkSpots.some(spot => {
+        if (spot.color !== COLOR_PLAYER) return false;
+        const dx = feetX - spot.x;
+        const dy = feetY - spot.y;
+        return (dx * dx + dy * dy) < (spot.radius + 10) * (spot.radius + 10);
+      });
+    }
+
+    // --- Update Loop ---
+    function update() {
+      if (gameState !== 'PLAYING') return;
+
+      // 1. Ink Regeneration
+      if (inkAmount < 100) {
+        inkAmount += player.isSquid ? 0.8 : 0.25;
+        if (inkAmount > 100) inkAmount = 100;
+      }
+      inkGauge.style.width = `${inkAmount}%`;
+
+      // 2. Squid Mode / Speed Calculation
+      const onFriendlyInk = checkOnPlayerInk();
+      player.isSquid = onFriendlyInk && player.isGrounded;
+
+      const speed = player.isSquid ? 5.8 : 3.8;
+      const jumpPower = -11.5;
+      const gravity = 0.55;
+
+      // 3. Movement Inputs
+      if (keys.left) {
+        player.vx = -speed;
+        player.facingRight = false;
+      } else if (keys.right) {
+        player.vx = speed;
+        player.facingRight = true;
+      } else {
+        player.vx *= 0.7; // Friction
+      }
+
+      if (keys.jump && player.isGrounded) {
+        player.vy = jumpPower;
+        player.isGrounded = false;
+        playSound('jump');
+      }
+
+      // Apply Gravity
+      player.vy += gravity;
+
+      // Position Update X
+      player.x += player.vx;
+
+      // X Collisions
+      platforms.forEach(p => {
+        if (
+          player.x < p.x + p.width &&
+          player.x + player.width > p.x &&
+          player.y < p.y + p.height &&
+          player.y + player.height > p.y
+        ) {
+          if (player.vx > 0) player.x = p.x - player.width;
+          else if (player.vx < 0) player.x = p.x + p.width;
+        }
+      });
+
+      // Position Update Y
+      player.y += player.vy;
+      player.isGrounded = false;
+
+      // Y Collisions
+      platforms.forEach(p => {
+        if (
+          player.x < p.x + p.width &&
+          player.x + player.width > p.x &&
+          player.y < p.y + p.height &&
+          player.y + player.height > p.y
+        ) {
+          if (player.vy > 0) { // Landing
+            player.y = p.y - player.height;
+            player.vy = 0;
+            player.isGrounded = true;
+          } else if (player.vy < 0) { // Hitting ceiling
+            player.y = p.y + p.height;
+            player.vy = 0;
+          }
+        }
+      });
+
+      // Fall off pit -> Game Over
+      if (player.y > 500) {
+        triggerGameOver('穴に落ちてしまった！');
+        return;
+      }
+
+      // 4. Shooting
+      if (player.shootCooldown > 0) player.shootCooldown--;
+
+      if (keys.shoot && player.shootCooldown <= 0 && inkAmount >= 8) {
+        inkAmount -= 8;
+        player.shootCooldown = 10;
+        playSound('shoot');
+
+        const bulletSpeed = 9;
+        bullets.push({
+          x: player.facingRight ? player.x + player.width + 5 : player.x - 5,
+          y: player.y + 12,
+          vx: player.facingRight ? bulletSpeed : -bulletSpeed,
+          vy: (Math.random() - 0.5) * 2 - 1,
+          radius: 7,
+          color: COLOR_PLAYER,
+          isPlayer: true
+        });
+      }
+
+      // Update Bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vy += 0.2; // slight arc
+
+        // Hit platform -> Paint ground
+        let hit = false;
+        platforms.forEach(p => {
+          if (b.x > p.x && b.x < p.x + p.width && b.y > p.y && b.y < p.y + p.height) {
+            hit = true;
+            // Add ink spot
+            inkSpots.push({ x: b.x, y: p.y, radius: 22 + Math.random() * 8, color: b.color });
+          }
+        });
+
+        // Hit enemies
+        if (b.isPlayer) {
+          enemies.forEach(e => {
+            if (e.alive && b.x > e.x && b.x < e.x + e.width && b.y > e.y && b.y < e.y + e.height) {
+              hit = true;
+              e.alive = false;
+              playSound('stomp');
+              // Splat enemy ink
+              inkSpots.push({ x: e.x + e.width / 2, y: e.y + e.height, radius: 30, color: COLOR_PLAYER });
+            }
+          });
+        }
+
+        if (hit || b.x < cameraX - 100 || b.x > cameraX + 900 || b.y > 500) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      // Limit max ink spots for performance
+      if (inkSpots.length > 80) inkSpots.shift();
+
+      // 5. Enemy Logic
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        e.x += e.vx;
+
+        // Turn around on edges/walls
+        platforms.forEach(p => {
+          if (e.x <= p.x || e.x + e.width >= p.x + p.width) {
+            e.vx *= -1;
+          }
+        });
+
+        // Player Collision
+        if (
+          player.x < e.x + e.width &&
+          player.x + player.width > e.x &&
+          player.y < e.y + e.height &&
+          player.y + player.height > e.y
+        ) {
+          // Stomp enemy from top like Mario
+          if (player.vy > 0 && player.y + player.height - player.vy <= e.y + 12) {
+            e.alive = false;
+            player.vy = -8.5; // Bounce
+            playSound('stomp');
+          } else {
+            triggerGameOver('敵のタコに接触した！');
+          }
+        }
+      });
+
+      // 6. Coins Collection
+      coins.forEach(c => {
+        if (!c.collected) {
+          const dx = (player.x + player.width / 2) - c.x;
+          const dy = (player.y + player.height / 2) - c.y;
+          if (dx * dx + dy * dy < 25 * 25) {
+            c.collected = true;
+            score += 100;
+            scoreDisplay.textContent = `イクラ: ${score}`;
+            playSound('coin');
+          }
+        }
+      });
+
+      // 7. Goal Collision
+      if (
+        player.x + player.width > goal.x &&
+        player.x < goal.x + goal.width &&
+        player.y + player.height > goal.y
+      ) {
+        triggerClear();
+      }
+
+      // Camera Follow Smoothly
+      const targetCamX = player.x - 200;
+      cameraX += (targetCamX - cameraX) * 0.1;
+      if (cameraX < 0) cameraX = 0;
+    }
+
+    // --- Render Loop ---
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(-Math.floor(cameraX), 0);
+
+      // Background Grid/Pattern
+      ctx.fillStyle = '#21183c';
+      for (let x = Math.floor(cameraX / 40) * 40; x < cameraX + 840; x += 40) {
+        for (let y = 0; y < 450; y += 40) {
+          ctx.fillRect(x + 18, y + 18, 4, 4);
+        }
+      }
+
+      // Platforms
+      platforms.forEach(p => {
+        ctx.fillStyle = '#322554';
+        ctx.fillRect(p.x, p.y, p.width, p.height);
+        ctx.strokeStyle = '#4e3b7a';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(p.x, p.y, p.width, p.height);
+      });
+
+      // Ink Spots on Ground
+      inkSpots.forEach(s => {
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ink shine
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(s.x - s.radius * 0.3, s.y - s.radius * 0.3, s.radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Bullets
+      bullets.forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Golden Eggs / Coins
+      coins.forEach(c => {
+        if (c.collected) return;
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y, 8, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      // Goal Flagpole
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(goal.x, goal.y, 6, goal.height);
+      ctx.fillStyle = '#12e3db';
+      ctx.beginPath();
+      ctx.moveTo(goal.x + 6, goal.y);
+      ctx.lineTo(goal.x + 45, goal.y + 20);
+      ctx.lineTo(goal.x + 6, goal.y + 40);
+      ctx.fill();
+
+      // Enemies (Octarians)
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        ctx.fillStyle = COLOR_ENEMY_INK;
+        // Body
+        ctx.beginPath();
+        ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, Math.PI, 0, false);
+        ctx.lineTo(e.x + e.width, e.y + e.height);
+        ctx.lineTo(e.x, e.y + e.height);
+        ctx.fill();
+
+        // Single Big Eye
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(e.x + e.width / 2, e.y + 14, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(e.x + e.width / 2 + (e.vx > 0 ? 2 : -2), e.y + 14, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Player (Inkling / Squid)
+      if (gameState === 'PLAYING' || gameState === 'CLEAR') {
+        if (player.isSquid) {
+          // Squid Form (Swimming in ink)
+          ctx.fillStyle = COLOR_PLAYER;
+          ctx.beginPath();
+          ctx.ellipse(player.x + player.width / 2, player.y + player.height - 8, 16, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Shiny Eyes
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(player.x + (player.facingRight ? 18 : 4), player.y + player.height - 12, 6, 4);
+        } else {
+          // Humanoid / Inkling Form
+          // Hair/Tentacles
+          ctx.fillStyle = COLOR_PLAYER;
+          ctx.beginPath();
+          ctx.arc(player.x + player.width / 2, player.y + 14, 15, Math.PI, 0);
+          ctx.fill();
+
+          // Body
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(player.x + 6, player.y + 16, 16, 14);
+
+          // Head / Face
+          ctx.fillStyle = '#ffe0bd';
+          ctx.fillRect(player.x + 4, player.y + 6, 20, 12);
+
+          // Eye Mask
+          ctx.fillStyle = '#000';
+          ctx.fillRect(player.x + (player.facingRight ? 8 : 4), player.y + 8, 14, 6);
+
+          // Gun (Shooter)
+          ctx.fillStyle = '#ffcc00';
+          const gunX = player.facingRight ? player.x + 18 : player.x - 6;
+          ctx.fillRect(gunX, player.y + 16, 12, 6);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // --- Main Game Loop ---
+    function gameLoop() {
+      update();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Event Listeners for UI
+    startBtn.addEventListener('click', startGame);
+    retryBtn.addEventListener('click', startGame);
+    nextBtn.addEventListener('click', startGame);
+
+    // Start loop
+    gameLoop();
+  </script>
+</body>
+</html>
